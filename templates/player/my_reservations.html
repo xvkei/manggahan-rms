@@ -1,0 +1,55 @@
+{% extends "player/base.html" %}
+{% load rms %}
+{% block title %}My reservations · {{ COMPLEX_NAME }}{% endblock %}
+
+{% block hero %}
+<div class="ph-hero">
+  <h1 style="font-size: 38px">My reservations</h1>
+  <div class="row" style="padding: 10px 16px; border-radius: 14px; background: var(--green-2)">
+    <span class="small" style="color: #C9DDD2">Loyalty points</span>
+    <b style="font-size: 18px">{{ player.loyalty_points }} pts</b>
+    {% if free_hours %}<span class="badge" style="background: var(--lime); color: var(--green)">{{ free_hours }} free hour{{ free_hours|pluralize }} ready</span>{% endif %}
+  </div>
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="page-narrow stack" style="max-width: 1000px">
+  {% include "partials/messages.html" %}
+  <div class="row" aria-label="Filter reservations">
+    <a class="chip {% if tab == 'upcoming' %}is-on{% endif %}" href="?tab=upcoming">Upcoming ({{ upcoming_count }})</a>
+    <a class="chip {% if tab == 'past' %}is-on{% endif %}" href="?tab=past">Past</a>
+    <a class="chip {% if tab == 'cancelled' %}is-on{% endif %}" href="?tab=cancelled">Cancelled</a>
+    <a class="btn btn-lime" style="margin-left: auto" href="{% url 'home' %}">Book a court</a>
+  </div>
+
+  {% for r in rows %}
+  <article class="res-card">
+    <div class="datebox {% if tab == 'upcoming' and r.status != 'pending' %}dark{% endif %}">
+      <span class="m">{{ r.date|date:"M"|upper }}</span><span class="d">{{ r.date.day }}</span>
+    </div>
+    <div style="flex: 1 1 280px">
+      <div class="row">
+        <h2 style="font-size: 19px; font-family: var(--body); font-weight: 700">{{ r.court.name }}</h2>
+        <span class="badge {{ r.status|status_class }}">{{ r.get_status_display }}</span>
+      </div>
+      <div class="muted" style="margin-top: 4px">{{ r.date|date:"D" }} · {% hour_range r.start_hour r.end_hour %} · {% if r.amount_paid %}{{ r.amount_paid|peso }} paid{% else %}{{ r.total|peso }} due{% endif %} · {{ r.code }}</div>
+      {% if r.status == "pending" and r.payment_deadline %}<div class="small" style="margin-top: 6px; color: var(--warn-fg)">Pay by {{ r.payment_deadline|date:"D, M j" }}, {{ r.payment_deadline|time:"g:i A" }} or this slot is released.</div>{% endif %}
+    </div>
+    <div class="row">
+      {% if r.status == "pending" %}<a class="btn btn-lime" href="{% url 'pay' r.manage_token %}">Pay now</a>{% endif %}
+      <a class="btn" href="{% url 'manage_booking' r.manage_token %}">{% if tab == 'upcoming' %}Show QR{% else %}View details{% endif %}</a>
+      {% if r.can_reschedule %}<a class="btn" href="{% url 'reschedule_booking' r.manage_token %}">Reschedule</a>{% endif %}
+      {% if r.can_cancel %}<a class="btn btn-danger" href="{% url 'cancel_booking' r.manage_token %}">Cancel</a>{% endif %}
+      {% if tab == "past" %}<a class="btn" href="{% url 'home' %}?sport={{ r.court.sport }}&court={{ r.court.pk }}">Book again</a>{% endif %}
+    </div>
+  </article>
+  {% empty %}
+  <div class="card" style="text-align: center">
+    <h2 style="font-size: 20px">{% if tab == 'upcoming' %}No upcoming games yet{% else %}Nothing here{% endif %}</h2>
+    <p class="muted">Bookings made with {{ player.mobile }} show up here.</p>
+    <a class="btn btn-lime" href="{% url 'home' %}">Book a court</a>
+  </div>
+  {% endfor %}
+</div>
+{% endblock %}

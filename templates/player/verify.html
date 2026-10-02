@@ -1,0 +1,96 @@
+{% extends "player/base.html" %}
+{% load rms %}
+{% block title %}Confirm your number · {{ COMPLEX_NAME }}{% endblock %}
+
+{% block hero %}
+<div class="ph-hero">
+  <h1 style="font-size: 38px">Confirm your mobile number</h1>
+  {% if hold %}{% with step=2 %}{% include "partials/stepper.html" %}{% endwith %}{% endif %}
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="page-narrow stack">
+  {% include "partials/messages.html" %}
+  {% if hold %}
+  <div class="alert alert-info">
+    Holding <b>{{ hold.court.name }}</b>, {{ hold.date|date:"D, M j" }}, {% hour_range hold.start hold.end %} for you until {{ hold.expires|time:"g:i A" }}.
+  </div>
+  {% endif %}
+
+  <section class="card stack">
+    <div class="row-between">
+      <h2>{% if step == "code" %}Enter the 6-digit code{% else %}No account needed{% endif %}</h2>
+      {% if hold %}<a class="small" href="{% url 'player_login' %}?next={% url 'booking_details' %}">Have an account? Sign in</a>{% endif %}
+    </div>
+
+    {% if error %}<div class="alert alert-error" role="alert">{{ error }}</div>{% endif %}
+
+    {% if step == "code" %}
+      <p class="muted" style="margin: 0">We sent a code to <b>{{ mobile }}</b>. It expires in 10 minutes.</p>
+      {% if demo_code %}
+      <div class="demo-note">Demo mode: no real SMS is sent. Your code is <b>{{ demo_code }}</b>.</div>
+      {% endif %}
+      <form method="post" class="stack" id="otp-form">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="check">
+        <input type="hidden" name="next" value="{{ next }}">
+        <fieldset style="border: 0; padding: 0; margin: 0">
+          <legend class="sr-only">6-digit code</legend>
+          <div class="otp">
+            {% for i in "123456" %}
+            <input type="text" name="digit" inputmode="numeric" maxlength="1" pattern="[0-9]" autocomplete="{% if forloop.first %}one-time-code{% else %}off{% endif %}" aria-label="Digit {{ i }}" required>
+            {% endfor %}
+          </div>
+        </fieldset>
+        <div class="row">
+          <button class="btn btn-lime" type="submit">Verify number</button>
+        </div>
+      </form>
+      <div class="row">
+        <form method="post">{% csrf_token %}<input type="hidden" name="action" value="send"><input type="hidden" name="mobile" value="{{ mobile }}"><input type="hidden" name="next" value="{{ next }}"><button class="btn btn-sm" type="submit">Resend code</button></form>
+        <form method="post">{% csrf_token %}<input type="hidden" name="action" value="change"><input type="hidden" name="next" value="{{ next }}"><button class="btn btn-sm" type="submit">Use a different number</button></form>
+      </div>
+    {% else %}
+      <p class="muted" style="margin: 0">We'll text a 6-digit code to confirm your number, then send your QR code and reminders there.</p>
+      <form method="post" class="row" style="align-items: flex-end">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="send">
+        <input type="hidden" name="next" value="{{ next }}">
+        <label class="field" style="flex: 1 1 260px">Mobile number
+          <input type="tel" name="mobile" value="{{ mobile }}" placeholder="0917 123 4567" autocomplete="tel" required>
+        </label>
+        <button class="btn btn-lime" type="submit" style="min-height: 46px">Send code</button>
+      </form>
+    {% endif %}
+  </section>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  // Move between the code boxes automatically and allow pasting all 6 digits.
+  (function () {
+    var boxes = document.querySelectorAll('#otp-form input[name="digit"]');
+    if (!boxes.length) return;
+    boxes[0].focus();
+    boxes.forEach(function (box, i) {
+      box.addEventListener("input", function () {
+        box.value = box.value.replace(/\D/g, "").slice(0, 1);
+        if (box.value && i < boxes.length - 1) boxes[i + 1].focus();
+      });
+      box.addEventListener("keydown", function (e) {
+        if (e.key === "Backspace" && !box.value && i > 0) boxes[i - 1].focus();
+      });
+      box.addEventListener("paste", function (e) {
+        var text = (e.clipboardData || window.clipboardData).getData("text").replace(/\D/g, "");
+        if (text.length >= 6) {
+          e.preventDefault();
+          boxes.forEach(function (b, j) { b.value = text[j] || ""; });
+          boxes[5].focus();
+        }
+      });
+    });
+  })();
+</script>
+{% endblock %}

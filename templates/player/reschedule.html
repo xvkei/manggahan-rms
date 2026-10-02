@@ -1,0 +1,47 @@
+{% extends "player/base.html" %}
+{% load rms %}
+{% block title %}Reschedule · {{ COMPLEX_NAME }}{% endblock %}
+
+{% block content %}
+<div class="page-narrow stack">
+  {% include "partials/messages.html" %}
+  <section class="card stack">
+    <div>
+      <h1 class="display" style="font-size: 28px">Reschedule</h1>
+      <p class="muted" style="margin: 6px 0 0">Now: {{ res.court.name }} · {{ res.date|date:"D, M j" }} · {% hour_range res.start_hour res.end_hour %} ({{ dur }} hr{{ dur|pluralize }}). Same court, same length. Your QR code stays the same.</p>
+    </div>
+    <div>
+      <div style="font-size: 14px; font-weight: 700; margin-bottom: 8px">New date</div>
+      <div class="row" style="gap: 8px">
+        {% for d in day_options %}
+        <a class="chip {% if d == day %}is-on{% endif %}" href="?date={{ d|date:'Y-m-d' }}">{{ d|date:"D, M j" }}</a>
+        {% endfor %}
+      </div>
+    </div>
+    <form method="post" class="stack">
+      {% csrf_token %}
+      <input type="hidden" name="date" value="{{ day|date:'Y-m-d' }}">
+      <fieldset style="border: 0; padding: 0; margin: 0">
+        <legend style="font-size: 14px; font-weight: 700; margin-bottom: 8px">Open start times on {{ day|date:"l, F j" }}</legend>
+        {% if starts %}
+        <div class="slots">
+          {% for h in starts %}
+          <label class="slot">
+            <input type="radio" name="start" value="{{ h }}" required>
+            <span class="face">{{ h|hour12 }}<span class="price">to {{ h|add:dur|hour12 }}</span></span>
+          </label>
+          {% endfor %}
+        </div>
+        {% else %}
+        <p class="muted">No open times for {{ dur }} hour{{ dur|pluralize }} on this day. Try another date.</p>
+        {% endif %}
+      </fieldset>
+      <p class="small muted" style="margin: 0">If the new time costs more (for example, evening rates), you'll pay the difference at the front desk. If it costs less, the difference is refunded.</p>
+      <div class="row">
+        <a class="btn btn-lg" href="{% url 'manage_booking' res.manage_token %}">Back</a>
+        {% if starts %}<button class="btn btn-lime btn-lg" type="submit">Move my booking</button>{% endif %}
+      </div>
+    </form>
+  </section>
+</div>
+{% endblock %}

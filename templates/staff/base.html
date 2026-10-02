@@ -1,0 +1,56 @@
+{% extends "base.html" %}
+{% block body %}
+<div class="shell">
+  <aside class="sidebar no-print">
+    <a class="brand" href="{% url 'staff_schedule' %}">
+      {% include "partials/logo.html" %}
+      <span class="brand-name">Manggahan<span class="brand-sub">Admin · {% if is_manager %}Manager{% else %}Front desk{% endif %}</span></span>
+    </a>
+    <nav class="snav" aria-label="Admin">
+      <a href="{% url 'staff_schedule' %}" class="{% if nav == 'schedule' %}is-on{% endif %}" {% if nav == 'schedule' %}aria-current="page"{% endif %}>
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"></rect><path d="M3 10h18M8 3v4M16 3v4"></path></svg>
+        Today's schedule
+      </a>
+      <a href="{% url 'staff_reservations' %}" class="{% if nav == 'reservations' %}is-on{% endif %}" {% if nav == 'reservations' %}aria-current="page"{% endif %}>
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><rect x="5" y="4" width="14" height="17" rx="2"></rect><path d="M9 3h6v2H9zM9 10h6M9 14h6M9 18h3"></path></svg>
+        Reservations &amp; refunds
+        {% with pending=nav_cancel_requests|add:nav_to_collect %}{% if pending %}<span class="count">{{ pending }}</span>{% endif %}{% endwith %}
+      </a>
+      <a href="{% url 'staff_walkin' %}" class="{% if nav == 'walkin' %}is-on{% endif %}" {% if nav == 'walkin' %}aria-current="page"{% endif %}>
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><rect x="3" y="10" width="18" height="10" rx="2"></rect><path d="M6 10V5h12v5M7 14h2M11 14h2M15 14h2M7 17h10"></path></svg>
+        Walk-in &amp; sales
+      </a>
+      <a href="{% url 'staff_league' %}" class="{% if nav == 'league' %}is-on{% endif %}" {% if nav == 'league' %}aria-current="page"{% endif %}>
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M8 21h8M12 17v4M7 4h10v5a5 5 0 0 1-10 0zM7 6H4a3 3 0 0 0 3 4M17 6h3a3 3 0 0 1-3 4"></path></svg>
+        Leagues &amp; tournaments
+      </a>
+      {% if is_manager %}
+      <a href="{% url 'staff_reports' %}" class="{% if nav == 'reports' %}is-on{% endif %}" {% if nav == 'reports' %}aria-current="page"{% endif %}>
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M5 20V11M11 20V5M17 20v-7M22 20H2"></path></svg>
+        Reports
+      </a>
+      <a href="{% url 'staff_courts' %}" class="{% if nav == 'courts' %}is-on{% endif %}" {% if nav == 'courts' %}aria-current="page"{% endif %}>
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="1"></rect><path d="M12 5v14M3 12h18"></path><circle cx="12" cy="12" r="3"></circle></svg>
+        Courts, rates &amp; promos
+      </a>
+      <a href="{% url 'staff_team' %}" class="{% if nav == 'team' %}is-on{% endif %}" {% if nav == 'team' %}aria-current="page"{% endif %}>
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><circle cx="9" cy="8" r="3.5"></circle><path d="M2.5 20c0-3.6 2.9-6 6.5-6s6.5 2.4 6.5 6"></path><circle cx="17" cy="9" r="2.5"></circle><path d="M16 14.2c3 .2 5.5 2.3 5.5 5.3"></path></svg>
+        Staff &amp; activity
+      </a>
+      {% endif %}
+    </nav>
+    <div class="me">
+      <span class="avatar" aria-hidden="true">{{ user.first_name|default:user.username|slice:":1"|upper }}</span>
+      <div>
+        <div class="who">{{ user.get_full_name|default:user.username }}</div>
+        <div class="role">{% if user.staff_profile %}{{ user.staff_profile.get_role_display }}{% if user.staff_profile.shift %} · {{ user.staff_profile.shift }}{% endif %}{% else %}Administrator{% endif %}</div>
+        <form method="post" action="{% url 'logout' %}">{% csrf_token %}<button type="submit">Sign out</button></form>
+      </div>
+    </div>
+  </aside>
+  <div class="smain">
+    {% include "partials/messages.html" %}
+    {% block content %}{% endblock %}
+  </div>
+</div>
+{% endblock %}

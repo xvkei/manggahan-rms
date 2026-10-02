@@ -1,0 +1,106 @@
+{% extends "staff/base.html" %}
+{% load rms %}
+{% block title %}Staff and activity · Manggahan admin{% endblock %}
+{% block content %}
+<div class="shead">
+  <div>
+    <div class="k">Manager view</div>
+    <h1>Staff &amp; activity</h1>
+  </div>
+</div>
+
+<div class="stats" style="grid-template-columns: repeat(auto-fit, minmax(240px, 1fr))">
+  {% for u in staff %}
+  <div class="stat row" style="gap: 12px; flex-wrap: nowrap">
+    <span class="avatar" style="{% if u.staff_profile.role == 'manager' or not u.staff_profile %}background: var(--green); color: #fff{% else %}background: var(--soft-2){% endif %}">{{ u.first_name|default:u.username|slice:":1"|upper }}</span>
+    <div style="flex-grow: 1; min-width: 0">
+      <b>{{ u.get_full_name|default:u.username }}</b>
+      <div class="small muted">{% if u.staff_profile %}{{ u.staff_profile.get_role_display }}{% if u.staff_profile.shift %} · {{ u.staff_profile.shift }}{% endif %}{% else %}Administrator{% endif %} · {{ u.username }}</div>
+    </div>
+    {% if u != user %}
+    <form method="post">{% csrf_token %}<input type="hidden" name="action" value="toggle_active"><input type="hidden" name="pk" value="{{ u.pk }}"><button class="badge {% if u.is_active %}st-confirmed{% else %}st-done{% endif %}" type="submit" style="border: 0; cursor: pointer" title="{% if u.is_active %}Deactivate{% else %}Reactivate{% endif %}">{% if u.is_active %}Active{% else %}Off{% endif %}</button></form>
+    {% else %}<span class="badge st-confirmed">You</span>{% endif %}
+  </div>
+  {% endfor %}
+</div>
+
+<details class="card card-tight">
+  <summary style="cursor: pointer; font-weight: 700">Add a staff account</summary>
+  <form method="post" class="grid-fields mt-2" style="align-items: end">
+    {% csrf_token %}<input type="hidden" name="action" value="add_staff">
+    <label class="field">Full name<input type="text" name="full_name" required></label>
+    <label class="field">Username<input type="text" name="username" autocomplete="off" required></label>
+    <label class="field">Password<input type="password" name="password" autocomplete="new-password" minlength="6" required></label>
+    <label class="field">Role<select name="role">{% for code, label in role_choices %}<option value="{{ code }}">{{ label }}</option>{% endfor %}</select></label>
+    <label class="field">Shift<input type="text" name="shift" placeholder="Day shift"></label>
+    <button class="btn btn-green" type="submit">Add staff</button>
+  </form>
+</details>
+
+<div class="split">
+  <section class="grow card card-flush">
+    <form method="get" class="row-between" style="padding: 14px 18px; border-bottom: 1px solid var(--line)">
+      <h2 style="font-family: var(--body); font-size: 17px; font-weight: 700">Activity log</h2>
+      <div class="row">
+        <select name="actor" aria-label="Filter by staff" style="width: 170px; min-height: 40px; border-radius: 999px">
+          <option value="">Everyone</option>
+          <option value="system" {% if actor == "system" %}selected{% endif %}>System (automatic)</option>
+          {% for u in staff %}<option value="{{ u.pk }}" {% if actor == u.pk|stringformat:"s" %}selected{% endif %}>{{ u.get_full_name|default:u.username }}</option>{% endfor %}
+        </select>
+        <input type="date" name="date" value="{{ day|date:'Y-m-d' }}" aria-label="Filter by date" style="width: 160px; min-height: 40px; border-radius: 999px">
+        <button class="btn btn-sm" type="submit">Filter</button>
+        <a class="btn btn-sm" href="{% url 'staff_activity_export' %}">Export</a>
+      </div>
+    </form>
+    <div class="scroll-x">
+      <table class="tbl" style="min-width: 560px">
+        <thead><tr><th>Time</th><th>By</th><th>Action</th><th>Reference</th></tr></thead>
+        <tbody>
+          {% for e in page %}
+          <tr>
+            <td class="nowrap muted">{{ e.created_at|date:"M j, g:i A" }}</td>
+            <td class="nowrap" style="font-weight: 700; {% if not e.actor %}color: var(--muted){% endif %}">{{ e.actor_name }}</td>
+            <td>{{ e.action }}</td>
+            <td class="nowrap muted">{{ e.reference }}</td>
+          </tr>
+          {% empty %}
+          <tr><td colspan="4" class="muted" style="padding: 24px 16px">No activity for this filter.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    <div class="pager">
+      <span>Page {{ page.number }} of {{ page.paginator.num_pages }}</span>
+      <span class="row" style="gap: 6px">
+        {% if page.has_previous %}<a class="round-btn" style="width: 40px; height: 40px" href="?actor={{ actor }}&date={{ day|date:'Y-m-d' }}&page={{ page.previous_page_number }}" aria-label="Previous page">‹</a>{% endif %}
+        {% if page.has_next %}<a class="round-btn" style="width: 40px; height: 40px" href="?actor={{ actor }}&date={{ day|date:'Y-m-d' }}&page={{ page.next_page_number }}" aria-label="Next page">›</a>{% endif %}
+      </span>
+    </div>
+  </section>
+
+  <aside class="aside">
+    <section class="card card-tight">
+      <h2 style="font-family: var(--body); font-size: 17px; font-weight: 700; margin-bottom: 10px">What each role can do</h2>
+      <table class="tbl">
+        <thead><tr><th>Action</th><th style="text-align: center">Front desk</th><th style="text-align: center">Manager</th></tr></thead>
+        <tbody>
+          {% for label, desk, mgr in roles %}
+          <tr><td>{{ label }}</td>
+            <td style="text-align: center">{% if desk %}<span aria-label="Allowed" style="color: var(--ok-fg); font-weight: 700">✓</span>{% else %}<span aria-label="Not allowed" class="muted">–</span>{% endif %}</td>
+            <td style="text-align: center">{% if mgr %}<span aria-label="Allowed" style="color: var(--ok-fg); font-weight: 700">✓</span>{% else %}<span aria-label="Not allowed" class="muted">–</span>{% endif %}</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </section>
+    <section class="card card-tight stack-sm">
+      <h2 style="font-family: var(--body); font-size: 17px; font-weight: 700">SMS outbox (demo)</h2>
+      <p class="small muted" style="margin: 0">No real SMS gateway is connected, so messages are stored here. Swap in a gateway such as Semaphore for real texts.</p>
+      {% for m in sms %}
+      <div class="list-row" style="align-items: flex-start"><div class="grow"><b>{{ m.mobile }}</b> <span class="small muted">· {{ m.created_at|date:"M j, g:i A" }}</span><br><span class="small">{{ m.body }}</span></div></div>
+      {% empty %}
+      <p class="small muted" style="margin: 0">No messages yet.</p>
+      {% endfor %}
+    </section>
+  </aside>
+</div>
+{% endblock %}

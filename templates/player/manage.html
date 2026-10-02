@@ -1,0 +1,104 @@
+{% extends "player/base.html" %}
+{% load rms %}
+{% block title %}{{ res.code }} · {{ COMPLEX_NAME }}{% endblock %}
+
+{% block hero %}
+{% if is_new %}
+<div class="ph-hero" style="justify-content: flex-end">
+  {% with step=3 %}{% include "partials/stepper.html" %}{% endwith %}
+</div>
+{% endif %}
+{% endblock %}
+
+{% block content %}
+<div class="page-narrow stack">
+  {% include "partials/messages.html" %}
+
+  <section class="card card-flush">
+    <div class="row" style="padding: 32px; gap: 28px; align-items: center; border-bottom: 1px dashed var(--line-2)">
+      <div style="flex: 1 1 340px">
+        {% if res.status == "confirmed" or res.status == "checked_in" %}
+          <div class="check-circle" style="margin-bottom: 16px"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#0F3D2E" stroke-width="3" aria-hidden="true"><path d="M5 12l5 5L20 7"></path></svg></div>
+          <h1 class="display" style="font-size: 40px">{% if is_new %}You're booked!{% else %}Your booking{% endif %}</h1>
+          <p class="muted" style="margin: 10px 0 0">{% if is_new %}We texted your QR code and a link to manage this booking to {{ res.player.masked_mobile }}. {% endif %}Show the QR code at the front desk when you arrive.</p>
+        {% elif res.status == "pending" %}
+          <h1 class="display" style="font-size: 40px">{% if is_new %}Slot reserved{% else %}Waiting for payment{% endif %}</h1>
+          <p class="muted" style="margin: 10px 0 0">Pay {{ res.balance_due|peso }} by <b>{{ res.payment_deadline|date:"D, M j" }}, {{ res.payment_deadline|time:"g:i A" }}</b> or the slot is released.</p>
+        {% else %}
+          <h1 class="display" style="font-size: 40px">Booking {{ res.get_status_display|lower }}</h1>
+        {% endif %}
+        <div class="row mt-2"><span class="badge {{ res.status|status_class }}">{{ res.get_status_display }}{% if res.status == "confirmed" and res.is_fully_paid %} · Paid{% endif %}</span>
+          {% if res.balance_due and res.status != "pending" and res.status != "cancelled" %}<span class="badge st-pending">Balance due {{ res.balance_due|peso }}</span>{% endif %}
+        </div>
+      </div>
+      {% if res.status == "confirmed" or res.status == "checked_in" or res.status == "pending" %}
+      <div style="display: flex; flex-direction: column; align-items: center; gap: 8px">
+        <div class="qr" id="qr" data-text="{{ qr_text }}" role="img" aria-label="Check-in QR code for {{ res.code }}"></div>
+        <span class="small muted">Scan at check-in</span>
+      </div>
+      {% endif %}
+    </div>
+    <dl style="margin: 0; padding: 24px 32px; display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px 28px">
+      <div><dt class="small muted">Reservation no.</dt><dd style="margin: 2px 0 0; font-weight: 700; font-size: 16px">{{ res.code }}</dd></div>
+      <div><dt class="small muted">Court</dt><dd style="margin: 2px 0 0; font-weight: 700; font-size: 16px">{{ res.court.name }}</dd></div>
+      <div><dt class="small muted">Date and time</dt><dd style="margin: 2px 0 0; font-weight: 700; font-size: 16px">{{ res.date|date:"D, M j, Y" }} · {% hour_range res.start_hour res.end_hour %}</dd></div>
+      <div><dt class="small muted">Player</dt><dd style="margin: 2px 0 0; font-weight: 700; font-size: 16px">{{ res.player.name }} · {{ res.get_player_type_display }} · {{ res.players_count }} player{{ res.players_count|pluralize }}</dd></div>
+      <div><dt class="small muted">Total</dt><dd style="margin: 2px 0 0; font-weight: 700; font-size: 16px">{{ res.total|peso }}{% if res.discount_note %} <span class="small muted">({{ res.discount_note }})</span>{% endif %}</dd></div>
+      <div><dt class="small muted">Paid</dt><dd style="margin: 2px 0 0; font-weight: 700; font-size: 16px">{{ res.amount_paid|peso }}{% if res.amount_paid %} via {{ res.get_payment_method_display }}{% endif %}</dd></div>
+      {% if items %}<div><dt class="small muted">Equipment</dt><dd style="margin: 2px 0 0; font-weight: 700; font-size: 16px">{% for i in items %}{{ i.item.name }} × {{ i.quantity }}{% if not forloop.last %}, {% endif %}{% endfor %}</dd></div>{% endif %}
+    </dl>
+  </section>
+
+  {% for r in refunds %}
+  <div class="alert {% if r.status == 'approved' %}alert-success{% elif r.status == 'declined' %}alert-error{% else %}alert-warning{% endif %}">
+    Refund {{ r.amount|peso }} ({{ r.get_tier_display }}): <b>{{ r.get_status_display }}</b>{% if r.reason %}. {{ r.reason }}{% endif %}
+  </div>
+  {% endfor %}
+
+  {% if res.status == "pending" or res.status == "confirmed" %}
+  <section class="card">
+    <h2 style="font-size: 22px; margin-bottom: 14px">Before your game</h2>
+    <ol class="steps-list">
+      {% if is_discount_type %}<li>Bring a valid ID. Your {{ res.get_player_type_display|lower }} discount is checked at the front desk.</li>{% endif %}
+      <li>Check in within {{ grace }} minutes of {{ res.start_hour|hour12 }}, or the court may be released.</li>
+      <li>Plans changed? Cancel by <b>{{ full_refund_until|date:"D, M j" }}, {{ full_refund_until|time:"g:i A" }}</b> for a full refund, or reschedule for free.</li>
+    </ol>
+  </section>
+  {% endif %}
+
+  {% if show_account_prompt %}
+  <section class="helpbox row-between" style="padding: 22px 26px">
+    <div style="flex: 1 1 360px">
+      <h2 class="display" style="font-size: 20px">Book here often?</h2>
+      <p style="margin: 4px 0 0">Create an account with this number to see all your bookings in one place and earn loyalty points.{% if points_this %} This booking earns {{ points_this }} point{{ points_this|pluralize }}.{% endif %}</p>
+    </div>
+    <a class="btn btn-green" href="{% url 'player_signup' %}">Create account</a>
+  </section>
+  {% endif %}
+
+  <div class="row">
+    {% if res.status == "pending" or res.balance_due and res.status == "confirmed" %}
+      <a class="btn btn-lime btn-lg" href="{% url 'pay' res.manage_token %}">Pay {{ res.balance_due|peso }} now</a>
+    {% endif %}
+    {% if res.can_reschedule %}<a class="btn btn-lg" href="{% url 'reschedule_booking' res.manage_token %}">Reschedule</a>{% endif %}
+    {% if res.can_cancel %}<a class="btn btn-lg btn-danger" href="{% url 'cancel_booking' res.manage_token %}">Cancel booking</a>{% endif %}
+    {% if user.is_authenticated and user.player %}<a class="btn btn-lg" href="{% url 'my_reservations' %}">My reservations</a>{% endif %}
+    <button class="btn btn-lg no-print" type="button" onclick="window.print()">Print or save as PDF</button>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<script>
+  (function () {
+    var el = document.getElementById("qr");
+    if (!el) return;
+    if (window.QRCode) {
+      new QRCode(el, { text: el.getAttribute("data-text"), width: 160, height: 160, colorDark: "#0F3D2E", colorLight: "#ffffff" });
+    } else {
+      el.textContent = "QR code unavailable offline";
+    }
+  })();
+</script>
+{% endblock %}

@@ -1,0 +1,80 @@
+{% extends "staff/base.html" %}
+{% load rms %}
+{% block title %}Reports · Manggahan admin{% endblock %}
+{% block content %}
+<div class="shead">
+  <div>
+    <div class="k">{{ label }} · {{ start|date:"M j" }} to {{ end|date:"M j, Y" }}</div>
+    <h1>Reports</h1>
+  </div>
+  <div class="row no-print">
+    <div class="segmented" aria-label="Period">
+      {% for code, name in periods %}{% if code != "custom" %}<a class="{% if period == code %}is-on{% endif %}" href="?period={{ code }}">{{ name }}</a>{% endif %}{% endfor %}
+    </div>
+    <a class="btn" href="{% url 'staff_reports_export' %}?{{ query }}">Export to Excel (CSV)</a>
+    <button class="btn" type="button" onclick="window.print()">Print or save as PDF</button>
+  </div>
+</div>
+<form method="get" class="row no-print" style="align-items: flex-end">
+  <input type="hidden" name="period" value="custom">
+  <label class="field" style="flex: 0 1 180px">From<input type="date" name="from" value="{{ start|date:'Y-m-d' }}"></label>
+  <label class="field" style="flex: 0 1 180px">To<input type="date" name="to" value="{{ end|date:'Y-m-d' }}"></label>
+  <button class="btn" type="submit">Show custom range</button>
+</form>
+
+<div class="stats">
+  <div class="stat dark"><div class="k">Total revenue</div><div class="v">{{ revenue|peso:0 }}</div><div class="s">After refunds</div></div>
+  <div class="stat"><div class="k">Bookings</div><div class="v">{{ bookings }}</div><div class="s">{{ online_pct }}% booked online</div></div>
+  <div class="stat"><div class="k">Court utilization</div><div class="v">{{ utilization }}%</div><div class="s">of open court-hours booked</div></div>
+  <div class="stat"><div class="k">No-show rate</div><div class="v">{{ no_show_rate }}%</div><div class="s">{{ no_shows }} no-show{{ no_shows|pluralize }}</div></div>
+</div>
+
+<div class="split">
+  <section class="card card-tight" style="flex: 1 1 380px; min-width: 0">
+    <h2 style="font-family: var(--body); font-size: 17px; font-weight: 700; margin-bottom: 16px">Revenue by source</h2>
+    <div class="stack">
+      {% for s in source_rows %}
+      <div>
+        <div class="row-between small" style="margin-bottom: 6px"><span style="font-size: 14px">{{ s.label }}</span><b style="font-size: 14px">{{ s.amount|peso:0 }}</b></div>
+        <div class="bar dark" role="img" aria-label="{{ s.pct }} percent of revenue"><i style="width: {{ s.pct }}%"></i></div>
+      </div>
+      {% endfor %}
+    </div>
+  </section>
+  <section class="card card-tight" style="flex: 1 1 380px; min-width: 0">
+    <h2 style="font-family: var(--body); font-size: 17px; font-weight: 700; margin-bottom: 16px">Bookings by sport</h2>
+    <div class="stack-sm">
+      {% for s in sport_rows %}
+      <div class="bar-row"><span>{{ s.label }}</span><div class="bar"><i style="width: {{ s.pct }}%"></i></div><b class="right">{{ s.count }}</b></div>
+      {% empty %}
+      <p class="small muted" style="margin: 0">No bookings in this period.</p>
+      {% endfor %}
+    </div>
+  </section>
+</div>
+
+<div class="split">
+  <section class="card card-tight" style="flex: 2 1 520px; min-width: 0">
+    <div class="row-between" style="margin-bottom: 14px">
+      <h2 style="font-family: var(--body); font-size: 17px; font-weight: 700">Peak hours · % of courts booked</h2>
+      <div class="legend">Low <i class="sw lv0"></i><i class="sw lv1"></i><i class="sw lv2"></i><i class="sw lv3"></i><i class="sw lv4"></i> High</div>
+    </div>
+    <div class="scroll-x">
+      <div class="heat" style="grid-template-columns: 48px repeat({{ block_labels|length }}, minmax(0, 1fr))">
+        <div></div>{% for b in block_labels %}<div class="h">{{ b }}</div>{% endfor %}
+        {% for row in heat_rows %}
+          <div class="d">{{ row.name }}</div>
+          {% for c in row.cells %}<div class="c lv{{ c.level }}">{{ c.pct }}</div>{% endfor %}
+        {% endfor %}
+      </div>
+    </div>
+    {% if insight %}<p class="mt-2" style="padding: 12px 14px; background: var(--lime-tint); border-radius: 12px; font-size: 14px; margin-bottom: 0"><b>Insight:</b> {{ insight }}</p>{% endif %}
+  </section>
+  <section class="card card-tight" style="flex: 1 1 280px; min-width: 0">
+    <h2 style="font-family: var(--body); font-size: 17px; font-weight: 700; margin-bottom: 8px">Cancellations and no-shows</h2>
+    <div class="kv-list">
+      {% for label, value in cancel_rows %}<div><span class="muted">{{ label }}</span><b>{{ value }}</b></div>{% endfor %}
+    </div>
+  </section>
+</div>
+{% endblock %}

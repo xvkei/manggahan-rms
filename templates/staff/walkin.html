@@ -1,0 +1,129 @@
+{% extends "staff/base.html" %}
+{% load rms %}
+{% block title %}Walk-in and sales · Manggahan admin{% endblock %}
+
+{% block content %}
+<div class="shead">
+  <div>
+    <div class="k">{{ day|date:"l, F j, Y" }}{% if day == today %} · {% now "g:i A" %}{% endif %}</div>
+    <h1>Walk-in &amp; sales</h1>
+  </div>
+  <div class="row">
+    <a class="btn" href="{% url 'staff_league' %}">League or tournament booking</a>
+  </div>
+</div>
+
+{% if errors %}<div class="alert alert-error" role="alert"><ul>{% for e in errors %}<li>{{ e }}</li>{% endfor %}</ul></div>{% endif %}
+
+<form method="post" id="pos" class="split">
+  {% csrf_token %}
+  <div class="grow">
+    <section class="card">
+      <div class="card-head">
+        <h2 style="font-size: 22px">1. Court and time</h2>
+        <div class="segmented" role="radiogroup" aria-label="Sale type">
+          <label class="{% if form.mode == 'booking' %}is-on{% endif %}" style="display: inline-flex; align-items: center; min-height: 38px; padding: 0 16px; border-radius: 999px; cursor: pointer"><input class="sr-only" type="radio" name="mode" value="booking" {% if form.mode == "booking" %}checked{% endif %}>Court booking</label>
+          <label class="{% if form.mode == 'items' %}is-on{% endif %}" style="display: inline-flex; align-items: center; min-height: 38px; padding: 0 16px; border-radius: 999px; cursor: pointer"><input class="sr-only" type="radio" name="mode" value="items" {% if form.mode == "items" %}checked{% endif %}>Items only</label>
+        </div>
+      </div>
+      <div id="booking-fields" class="stack">
+        <div class="row" style="align-items: flex-end">
+          <label class="field" style="flex: 0 1 200px">Date
+            <input type="date" name="date" value="{{ day|date:'Y-m-d' }}" min="{{ today|date:'Y-m-d' }}" id="date-input">
+          </label>
+          <div class="row" style="gap: 6px; flex: 1 1 300px" aria-label="Sport filter">
+            <button type="button" class="chip is-on" data-sport="">All</button>
+            {% for code, label in sports %}<button type="button" class="chip" data-sport="{{ code }}">{{ label }}</button>{% endfor %}
+          </div>
+        </div>
+        <fieldset style="border: 0; padding: 0; margin: 0">
+          <legend style="font-size: 14px; font-weight: 700; margin-bottom: 8px">Court</legend>
+          <div class="rcards" style="grid-template-columns: repeat(auto-fill, minmax(150px, 1fr))">
+            {% for c in courts %}
+            <label class="rcard" data-court-sport="{{ c.sport }}">
+              <input type="radio" name="court" value="{{ c.pk }}" {% if form.court == c.pk|stringformat:"s" %}checked{% endif %}>
+              <span><b>{{ c.name }}</b><span class="note">{{ c.day_rate|peso:0 }} / {{ c.evening_rate|peso:0 }}</span></span>
+            </label>
+            {% endfor %}
+          </div>
+        </fieldset>
+        <div>
+          <div style="font-size: 14px; font-weight: 700; margin-bottom: 8px" id="strip-label">Availability</div>
+          <div class="slots" id="strip" style="grid-template-columns: repeat(auto-fill, minmax(78px, 1fr))"></div>
+        </div>
+        <div class="grid-fields">
+          <label class="field">Start
+            <select name="start" id="start">{% for h in hours %}<option value="{{ h }}" {% if form.start == h|stringformat:"s" %}selected{% endif %}>{{ h|hour12 }}</option>{% endfor %}</select>
+          </label>
+          <label class="field">End
+            <select name="end" id="end">{% for h in end_hours %}<option value="{{ h }}" {% if form.end == h|stringformat:"s" %}selected{% endif %}>{{ h|hour12 }}</option>{% endfor %}</select>
+          </label>
+        </div>
+      </div>
+      <p id="items-note" class="muted" hidden style="margin: 0">Selling items only. No court is booked.</p>
+    </section>
+
+    <section class="card">
+      <h2 style="font-size: 22px; margin-bottom: 14px">2. Player</h2>
+      <div class="row" style="gap: 8px" role="radiogroup" aria-label="Player type">
+        {% for value, label in player_types %}
+        <label class="chip" style="gap: 6px"><input type="radio" name="player_type" value="{{ value }}" {% if form.player_type == value %}checked{% endif %}>{{ label }}</label>
+        {% endfor %}
+      </div>
+      <div class="grid-fields mt-2">
+        <label class="field">Name<input type="text" name="name" value="{{ form.name }}" placeholder="Walk-in"></label>
+        <label class="field">Mobile <span class="hint">(optional, for points and receipt)</span><input type="tel" name="mobile" value="{{ form.mobile }}" placeholder="09XX XXX XXXX"></label>
+      </div>
+      <label class="check mt-1" style="background: var(--soft); border-radius: 12px; padding: 0 14px">
+        <input type="checkbox" name="use_package" {% if form.use_package %}checked{% endif %}>
+        Use prepaid package hours for the court (enter the member's mobile number)
+      </label>
+    </section>
+  </div>
+
+  <aside class="aside">
+    <section class="card card-tight">
+      <h2 style="font-family: var(--body); font-size: 17px; font-weight: 700; margin-bottom: 12px">Add items</h2>
+      <div class="item-grid">
+        {% for i in items %}
+        <button type="button" class="item-btn" data-add="{{ i.pk }}" data-name="{{ i.name }}"><b>{{ i.name }}</b>{{ i.price|peso:0 }} <span class="qty" data-qty-badge="{{ i.pk }}" hidden></span></button>
+        {% endfor %}
+      </div>
+      {% for i in items %}<input type="hidden" name="item_{{ i.pk }}" value="{{ i.qty }}" data-qty="{{ i.pk }}">{% endfor %}
+      {% if plans %}
+      <label class="field mt-2">Sell a membership or package
+        <select name="plan" id="plan">
+          <option value="">None</option>
+          {% for p in plans %}<option value="{{ p.pk }}" {% if form.plan == p.pk|stringformat:"s" %}selected{% endif %}>{{ p.name }} · {{ p.price|peso:0 }}</option>{% endfor %}
+        </select>
+      </label>
+      {% endif %}
+    </section>
+
+    <section class="card card-flush">
+      <div class="panel-head green" style="justify-content: space-between"><span>Current sale</span><span class="small" style="font-weight: 400; color: #C9DDD2" id="cart-who">Walk-in</span></div>
+      <div class="panel-body">
+        <div class="stack-sm" id="cart"><p class="small muted" style="margin: 0">Nothing added yet.</p></div>
+        <div class="total-row"><span style="font-weight: 700">Total</span><span class="amt" id="cart-total">₱0</span></div>
+        <div class="row" style="gap: 6px" role="radiogroup" aria-label="Payment method">
+          {% for value, label in desk_methods %}
+          <label class="chip" style="gap: 6px"><input type="radio" name="method" value="{{ value }}" {% if form.method == value %}checked{% endif %}>{{ label }}</label>
+          {% endfor %}
+        </div>
+        <div class="row" id="cash-row" style="align-items: flex-end">
+          <label class="field" style="flex: 1 1 0">Cash received<input type="text" name="cash" value="{{ form.cash }}" inputmode="decimal" id="cash" placeholder="0"></label>
+          <div style="flex: 1 1 0; display: flex; flex-direction: column; gap: 6px"><span style="font-size: 14px; font-weight: 700">Change</span><span class="change-box" id="change">₱0</span></div>
+        </div>
+        <label class="field" id="ref-row" hidden>Reference no.<input type="text" name="reference" value="{{ form.reference }}"></label>
+        <button class="btn btn-lime btn-lg btn-block" type="submit" id="charge">Charge</button>
+      </div>
+    </section>
+  </aside>
+</form>
+{{ js|json_script:"pos-data" }}
+{% endblock %}
+
+{% block scripts %}
+{% load static %}
+<script src="{% static 'js/walkin.js' %}"></script>
+{% endblock %}

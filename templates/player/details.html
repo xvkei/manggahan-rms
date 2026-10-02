@@ -1,0 +1,166 @@
+{% extends "player/base.html" %}
+{% load rms %}
+{% block title %}Details and payment · {{ COMPLEX_NAME }}{% endblock %}
+
+{% block hero %}
+<div class="ph-hero">
+  <h1 style="font-size: 38px">Details &amp; payment</h1>
+  {% with step=2 %}{% include "partials/stepper.html" %}{% endwith %}
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="page">
+  {% include "partials/messages.html" %}
+  {% if errors %}
+  <div class="alert alert-error mt-1" role="alert"><ul>{% for e in errors %}<li>{{ e }}</li>{% endfor %}</ul></div>
+  {% endif %}
+  <form method="post" id="details-form" class="layout mt-2">
+    {% csrf_token %}
+    <div class="main">
+
+      <section class="card">
+        <div class="card-head">
+          <h2>Your contact details</h2>
+          {% if user.is_authenticated %}<span class="badge st-confirmed">Signed in</span>{% endif %}
+        </div>
+        <div class="row">
+          <span class="badge st-confirmed" style="font-size: 13px; padding: 6px 12px">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" aria-hidden="true" style="margin-right: 6px"><path d="M5 12l5 5L20 7"></path></svg>
+            {{ mobile }} verified
+          </span>
+          {% if not user.is_authenticated %}<a class="small" href="{% url 'verify_mobile' %}">Use a different number</a>{% endif %}
+        </div>
+        <label class="check mt-1">
+          <input type="checkbox" name="reminders" {% if form.reminders %}checked{% endif %}>
+          Text me reminders for my payment deadline and game time
+        </label>
+      </section>
+
+      <section class="card">
+        <h2>Who's playing?</h2>
+        <p class="lead">Your player type sets your rate. Bring a valid ID for discounted rates.</p>
+        <fieldset style="border: 0; padding: 0; margin: 0">
+          <legend class="sr-only">Player type</legend>
+          <div class="rcards">
+            {% for t in type_options %}
+            <label class="rcard">
+              <input type="radio" name="player_type" value="{{ t.value }}" {% if form.player_type == t.value %}checked{% endif %}>
+              <span><b>{{ t.label }}</b><span class="note">{{ t.note }}</span></span>
+            </label>
+            {% endfor %}
+          </div>
+        </fieldset>
+        <div class="row mt-2" style="align-items: flex-end; gap: 16px">
+          <label class="field" style="flex: 2 1 260px">Full name
+            <input type="text" name="name" value="{{ form.name }}" autocomplete="name" required>
+          </label>
+          <div style="flex: 1 1 150px; display: flex; flex-direction: column; gap: 6px">
+            <span style="font-size: 14px; font-weight: 700" id="players-label">Players</span>
+            <div class="stepper-input" data-stepper>
+              <button type="button" data-step="-1" aria-label="Fewer players">−</button>
+              <input type="number" name="players" value="{{ form.players }}" min="1" max="40" aria-labelledby="players-label">
+              <button type="button" data-step="1" aria-label="More players">+</button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {% if items %}
+      <section class="card">
+        <h2>Add equipment <span class="muted" style="font: 500 15px var(--body)">(optional)</span></h2>
+        <p class="lead">Pick everything up at the front desk when you check in.</p>
+        <div class="equip">
+          {% for i in items %}
+          <div class="equip-row">
+            <span><b>{{ i.name }}</b><br><span class="small muted">{{ i.price|peso:0 }} each</span></span>
+            <div class="stepper-input" data-stepper>
+              <button type="button" data-step="-1" aria-label="Fewer {{ i.name }}">−</button>
+              <input type="number" name="item_{{ i.pk }}" value="{{ i.qty }}" min="0" max="20" data-item="{{ i.pk }}" aria-label="{{ i.name }} quantity">
+              <button type="button" data-step="1" aria-label="More {{ i.name }}">+</button>
+            </div>
+          </div>
+          {% endfor %}
+        </div>
+      </section>
+      {% endif %}
+
+      <section class="card">
+        <h2>How do you want to pay?</h2>
+        <p class="lead">{% if desk_allowed %}Online payments confirm your slot right away. If you pay at the desk, pay by {{ deadline|date:"D, M j" }}, {{ deadline|time:"g:i A" }} or the slot is released.{% else %}Your game starts soon, so pay online to confirm it.{% endif %}</p>
+        <fieldset style="border: 0; padding: 0; margin: 0">
+          <legend class="sr-only">Payment method</legend>
+          <div class="rcards">
+            {% for value, label in online_methods %}
+            <label class="rcard">
+              <input type="radio" name="method" value="{{ value }}" {% if form.method == value %}checked{% endif %}>
+              <span><b>{{ label }}</b><span class="note">Confirmed right away</span></span>
+            </label>
+            {% endfor %}
+            <label class="rcard">
+              <input type="radio" name="method" value="desk" {% if form.method == "desk" %}checked{% endif %} {% if not desk_allowed %}disabled{% endif %}>
+              <span><b>Pay at the front desk</b><span class="note">{% if desk_allowed %}Cash · stays Pending until paid{% else %}Not available this close to start time{% endif %}</span></span>
+            </label>
+          </div>
+        </fieldset>
+      </section>
+
+      <section class="card">
+        <h2>Cancellation policy</h2>
+        <p class="lead">For this booking, the deadlines are already worked out for you.</p>
+        <div class="tiers">
+          <div class="tier tier-ok"><b>Full refund</b>Cancel by {{ full_refund_until|date:"D, M j" }}, {{ full_refund_until|time:"g:i A" }} (24 hours or more before).</div>
+          <div class="tier tier-warn"><b>50% refund</b>Cancel less than 24 hours before your game.</div>
+          <div class="tier tier-bad"><b>No refund</b>No-show, or no check-in within {{ grace }} minutes of start time.</div>
+          <div class="tier tier-info"><b>Complex cancels</b>Maintenance or official use: always a full refund or free rebooking.</div>
+        </div>
+        <label class="check mt-2">
+          <input type="checkbox" name="agree" {% if form.agree %}checked{% endif %} required>
+          I agree to the cancellation policy and the complex rules.
+        </label>
+      </section>
+    </div>
+
+    <aside class="side">
+      <div class="summary">
+        <div class="summary-head">
+          <div class="k">Your reservation</div>
+          <div class="v">{{ hold.court.name }}</div>
+        </div>
+        <div class="summary-body">
+          <dl class="kv">
+            <dt>Date</dt><dd>{{ hold.date|date:"D, M j, Y" }}</dd>
+            <dt>Time</dt><dd>{% hour_range hold.start hold.end %}</dd>
+            <dt>Player type</dt><dd id="s-type">{{ form.player_type }}</dd>
+          </dl>
+          <div class="lines">
+            <div><span class="muted">Court fee · {{ hold.hours }} hr{{ hold.hours|pluralize }}</span><span id="s-fee">{{ q.court_fee|peso }}</span></div>
+            <div id="s-disc-row"><span class="muted" id="s-disc-label">Discount</span><span id="s-disc">− {{ q.discount|peso }}</span></div>
+            <div id="s-free-row" {% if not form.redeem %}hidden{% endif %}><span class="muted">Free hour (points)</span><span id="s-free">− {{ q.free_hour_value|peso }}</span></div>
+            <div><span class="muted">Equipment</span><span id="s-equip">{% if q.equipment_total %}{{ q.equipment_total|peso }}{% else %}None added{% endif %}</span></div>
+          </div>
+          {% if free_hour_ready %}
+          <label class="check" style="background: var(--lime-tint); border-radius: 12px; padding: 0 12px">
+            <input type="checkbox" name="redeem" id="redeem" {% if form.redeem %}checked{% endif %}>
+            Use {{ cfg.points_per_free_hour }} points for 1 free hour ({{ player.loyalty_points }} pts)
+          </label>
+          {% endif %}
+          <div class="total-row">
+            <span style="font-weight: 700">Total</span>
+            <span class="amt" id="s-total">{{ q.total|peso }}</span>
+          </div>
+          <button class="btn btn-lime btn-lg btn-block" type="submit" id="pay-btn">Continue to payment</button>
+          <a class="btn btn-block" href="{% url 'home' %}?sport={{ hold.court.sport }}&court={{ hold.court.pk }}&date={{ hold.date|date:'Y-m-d' }}">Back</a>
+        </div>
+      </div>
+      <div class="helpbox">Your slot is held until {{ hold.expires|time:"g:i A" }} while you finish.</div>
+    </aside>
+  </form>
+</div>
+{{ price_data|json_script:"price-data" }}
+{% endblock %}
+
+{% block scripts %}
+{% load static %}
+<script src="{% static 'js/details.js' %}"></script>
+{% endblock %}

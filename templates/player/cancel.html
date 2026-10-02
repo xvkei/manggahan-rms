@@ -1,0 +1,53 @@
+{% extends "player/base.html" %}
+{% load rms %}
+{% block title %}Cancel booking · {{ COMPLEX_NAME }}{% endblock %}
+
+{% block content %}
+<div class="page-narrow">
+  <section class="card stack" style="max-width: 560px; margin: 24px auto">
+    <div>
+      <h1 class="display" style="font-size: 28px">Cancel this reservation?</h1>
+      <p class="muted" style="margin: 6px 0 0">{{ res.court.name }} · {{ res.date|date:"D, M j" }} · {% hour_range res.start_hour res.end_hour %}</p>
+    </div>
+
+    {% if res.amount_paid %}
+      <div class="tier {% if preview.percent == 100 %}tier-ok{% elif preview.percent == 50 %}tier-warn{% else %}tier-bad{% endif %}" style="padding: 16px">
+        <div style="font-weight: 700; font-size: 13px">
+          {% if preview.percent == 100 %}You're cancelling more than 24 hours before your game{% elif preview.percent == 50 %}You're cancelling less than 24 hours before your game{% else %}Your game has already started{% endif %}
+        </div>
+        <div class="row-between mt-1">
+          <span>{% if preview.percent == 100 %}Full refund{% elif preview.percent == 50 %}50% refund{% else %}No refund{% endif %}</span>
+          <b class="display" style="font-size: 28px">{{ preview.amount|peso }}</b>
+        </div>
+      </div>
+      <div>
+        <div class="refund-bar"><i class="a"></i><i class="b"></i><i class="c"></i></div>
+        <div class="row-between small muted mt-1">
+          <span><b style="color: var(--ink)">Now</b><br>Full until {{ preview.full_until|date:"M j" }}, {{ preview.full_until|time:"g A" }}</span>
+          <span style="text-align: center">50% until<br>{{ preview.half_until|date:"M j" }}, {{ preview.half_until|time:"g A" }}</span>
+          <span style="text-align: right">After start<br>No refund</span>
+        </div>
+      </div>
+      <div class="kv-list" style="border: 1px solid var(--line); border-radius: 14px; padding: 4px 16px">
+        <div><span class="muted">Refund goes to</span><b>{{ res.get_payment_method_display }} · {{ res.player.masked_mobile }}</b></div>
+        <div><span class="muted">When</span><b>3 to 5 business days after approval</b></div>
+      </div>
+    {% else %}
+      <div class="alert alert-info">This booking isn't paid yet, so there's nothing to refund. The slot will be released right away.</div>
+    {% endif %}
+
+    {% if res.can_reschedule %}
+    <div class="row-between" style="background: var(--lime-tint); border-radius: 14px; padding: 12px 16px; font-size: 14px">
+      <span>Just need a different time? Reschedule for free instead.</span>
+      <a href="{% url 'reschedule_booking' res.manage_token %}" style="font-weight: 700">Reschedule</a>
+    </div>
+    {% endif %}
+
+    <form method="post" class="row">
+      {% csrf_token %}
+      <a class="btn btn-lg" style="flex: 1 1 160px" href="{% url 'manage_booking' res.manage_token %}">Keep reservation</a>
+      <button class="btn btn-lg btn-danger-solid" style="flex: 1 1 160px" type="submit">Yes, cancel it</button>
+    </form>
+  </section>
+</div>
+{% endblock %}

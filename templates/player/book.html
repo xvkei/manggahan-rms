@@ -1,0 +1,159 @@
+{% extends "player/base.html" %}
+{% load rms %}
+{% block title %}Book a court · {{ COMPLEX_NAME }}{% endblock %}
+
+{% block hero %}
+<div class="ph-hero">
+  <div style="flex: 1 1 480px">
+    <h1>Book a court in three steps.</h1>
+    <p>Pick a sport and an open slot. You'll see the price before you pay, and you don't need an account.</p>
+  </div>
+  {% with step=1 %}{% include "partials/stepper.html" %}{% endwith %}
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="page">
+  {% include "partials/messages.html" %}
+  <div class="layout{% if messages %} mt-2{% endif %}">
+    <div class="main">
+
+      <section class="card" aria-labelledby="sport-h">
+        <h2 id="sport-h" style="margin-bottom: 16px">1. Choose a sport</h2>
+        <div class="tiles">
+          {% for s in sports %}
+          <a class="tile {% if s.code == sport %}is-on{% endif %}" href="?sport={{ s.code }}&date={{ day|date:'Y-m-d' }}" {% if s.code == sport %}aria-current="true"{% endif %}>
+            {% include "partials/sport_icon.html" with code=s.code %}
+            <span><b>{{ s.label }}</b><span class="sub">{{ s.count }} {{ s.unit }} · from {{ s.from_rate|peso:0 }}/hr</span></span>
+          </a>
+          {% empty %}
+          <p class="muted">No courts are open for booking yet.</p>
+          {% endfor %}
+        </div>
+      </section>
+
+      {% if court %}
+      <section class="card" aria-labelledby="time-h">
+        <h2 id="time-h" style="margin-bottom: 18px">2. Pick a date and time</h2>
+        <div class="row" style="align-items: flex-start; gap: 28px">
+          <div style="flex: 1 1 280px; max-width: 340px">
+            <div class="cal-head">
+              {% if prev_month %}<a class="round-btn" href="?sport={{ sport }}&court={{ court.pk }}&date={{ prev_month|date:'Y-m-d' }}" aria-label="Previous month">‹</a>{% else %}<span class="round-btn" aria-disabled="true"></span>{% endif %}
+              <b>{{ day|date:"F Y" }}</b>
+              {% if next_month %}<a class="round-btn" href="?sport={{ sport }}&court={{ court.pk }}&date={{ next_month|date:'Y-m-d' }}" aria-label="Next month">›</a>{% else %}<span class="round-btn" aria-disabled="true"></span>{% endif %}
+            </div>
+            <div class="cal">
+              <div class="dow">Sun</div><div class="dow">Mon</div><div class="dow">Tue</div><div class="dow">Wed</div><div class="dow">Thu</div><div class="dow">Fri</div><div class="dow">Sat</div>
+              {% for week in weeks %}{% for d in week %}
+                {% if not d.in_month %}<span class="day out" aria-hidden="true">{{ d.date.day }}</span>
+                {% elif d.disabled %}<span class="day off">{{ d.date.day }}</span>
+                {% else %}<a href="?sport={{ sport }}&court={{ court.pk }}&date={{ d.date|date:'Y-m-d' }}" class="{% if d.selected %}sel{% elif d.today %}today{% endif %}" {% if d.selected %}aria-current="date"{% endif %} aria-label="{{ d.date|date:'l, F j' }}">{{ d.date.day }}</a>
+                {% endif %}
+              {% endfor %}{% endfor %}
+            </div>
+          </div>
+
+          <form method="post" action="{% url 'hold_slots' %}" id="slot-form" style="flex: 1 1 340px; min-width: 0" class="stack">
+            {% csrf_token %}
+            <input type="hidden" name="court" value="{{ court.pk }}">
+            <input type="hidden" name="date" value="{{ day|date:'Y-m-d' }}">
+            <div>
+              <div style="font-size: 14px; font-weight: 700; margin-bottom: 8px">Court</div>
+              <div class="row" style="gap: 8px">
+                {% for c in sport_courts %}
+                  {% if c.open_count %}
+                  <a class="chip {% if c.pk == court.pk %}is-on{% endif %}" href="?sport={{ sport }}&court={{ c.pk }}&date={{ day|date:'Y-m-d' }}">{{ c.name }}</a>
+                  {% else %}
+                  <span class="chip is-off">{{ c.name }} · Full</span>
+                  {% endif %}
+                {% endfor %}
+              </div>
+            </div>
+            <div>
+              <div class="row-between" style="margin-bottom: 8px">
+                <div style="font-size: 14px; font-weight: 700">{{ day|date:"l, F j" }} · 1-hour slots</div>
+                <div class="legend">
+                  <span><i class="sw" style="border: 1px solid #9DA79F"></i>Open</span>
+                  <span><i class="sw" style="background: #0F3D2E"></i>Selected</span>
+                  <span><i class="sw" style="background: #E2E5DD"></i>Taken</span>
+                </div>
+              </div>
+              <fieldset style="border: 0; padding: 0; margin: 0">
+                <legend class="sr-only">Time slots</legend>
+                <div class="slots">
+                  {% for s in slots %}
+                    {% if s.state == "open" %}
+                    <label class="slot">
+                      <input type="checkbox" name="hours" value="{{ s.hour }}" data-hour="{{ s.hour }}">
+                      <span class="face">{{ s.hour|hour12 }}<span class="price {% if s.promo %}promo{% endif %}">{{ s.price|peso:0 }}{% if s.promo %} promo{% endif %}</span></span>
+                    </label>
+                    {% else %}
+                    <div class="slot {% if s.state == 'taken' %}taken{% elif s.state == 'maintenance' %}maint{% else %}past{% endif %}">
+                      <span class="face"><span class="t">{{ s.hour|hour12 }}</span><span class="price">{% if s.state == "taken" %}Taken{% elif s.state == "maintenance" %}Closed{% else %}Past{% endif %}</span></span>
+                    </div>
+                    {% endif %}
+                  {% endfor %}
+                </div>
+              </fieldset>
+              <p class="small muted" style="margin: 10px 0 0">
+                {% if any_promo %}Promo prices are already applied. {% endif %}Evening rate applies from {{ evening_label }} (court lights on).
+              </p>
+            </div>
+          </form>
+        </div>
+      </section>
+      {% endif %}
+
+      <section class="card" id="rates" aria-labelledby="rates-h">
+        <h2 id="rates-h">Rates per hour</h2>
+        <p class="lead">Student, member, and senior/PWD discounts are applied automatically. Only the biggest discount applies to each hour.</p>
+        <div class="scroll-x">
+          <table class="rates">
+            <thead><tr><th>Sport</th><th>{{ cfg.open_hour|hour_short }} to {{ cfg.evening_start_hour|hour_short }}</th><th>{{ cfg.evening_start_hour|hour_short }} to {{ cfg.close_hour|hour_short }}</th></tr></thead>
+            <tbody>
+              {% for r in rate_rows %}
+              <tr><td>{{ r.label }}{% if r.note %} ({{ r.note }}){% endif %}</td><td>{{ r.day|peso:0 }}</td><td>{{ r.evening|peso:0 }}</td></tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+        <div class="tiers mt-2">
+          <div class="tier tier-ok"><b>Full refund</b>Cancel 24 hours or more before your game.</div>
+          <div class="tier tier-warn"><b>50% refund</b>Cancel less than 24 hours before.</div>
+          <div class="tier tier-bad"><b>No refund</b>No-show, or no check-in within {{ cfg.grace_minutes }} minutes of start.</div>
+          <div class="tier tier-info"><b>Complex cancels</b>Maintenance or official use: always a full refund.</div>
+        </div>
+      </section>
+    </div>
+
+    <aside class="side">
+      <div class="summary">
+        <div class="summary-head">
+          <div class="k">Your selection</div>
+          <div class="v">{% if court %}{{ court.name }}{% else %}No court selected{% endif %}</div>
+        </div>
+        <div class="summary-body">
+          <dl class="kv">
+            <dt>Date</dt><dd>{{ day|date:"D, M j, Y" }}</dd>
+            <dt>Time</dt><dd id="sum-time">Pick slots</dd>
+            <dt>Duration</dt><dd id="sum-dur">0 hours</dd>
+          </dl>
+          <div class="total-row">
+            <span class="muted" id="sum-calc">Before discounts</span>
+            <span class="amt" id="sum-total">₱0</span>
+          </div>
+          <button type="submit" form="slot-form" class="btn btn-lime btn-lg btn-block" id="continue-btn" disabled>Continue</button>
+          <p class="small muted" style="margin: 0" id="slot-hint">Pick one or more slots next to each other.</p>
+        </div>
+      </div>
+      <div class="helpbox"><b>Need help booking?</b><br>Call the front desk at {{ CONTACT_NUMBER }} or walk in from {{ cfg.open_hour|hour12 }} to {{ cfg.close_hour|hour12 }}.</div>
+    </aside>
+  </div>
+</div>
+{{ slot_data|json_script:"slot-data" }}
+{% endblock %}
+
+{% block scripts %}
+{% load static %}
+<script src="{% static 'js/book.js' %}"></script>
+{% endblock %}

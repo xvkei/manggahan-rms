@@ -1,0 +1,41 @@
+{% extends "player/base.html" %}
+{% load rms %}
+{% block title %}Pay · {{ COMPLEX_NAME }}{% endblock %}
+
+{% block content %}
+<div class="page-narrow">
+  {% include "partials/messages.html" %}
+  <div class="row" style="justify-content: center; margin-top: 16px">
+    {% for value, label in online_methods %}
+    <a class="chip {% if method == value %}is-on{% endif %}" href="?method={{ value }}">{{ label }}</a>
+    {% endfor %}
+  </div>
+  <div class="gateway">
+    <div class="gateway-head gw-{{ method }}">
+      <b>{{ method_label }}</b>
+      <span class="small">Simulated checkout</span>
+    </div>
+    <div class="summary-body" style="padding: 24px">
+      <div class="demo-note">Demo mode: this page stands in for the real payment provider (for example PayMongo). No money is charged.</div>
+      <dl class="kv">
+        <dt>Merchant</dt><dd>{{ COMPLEX_NAME }}</dd>
+        <dt>Booking</dt><dd>{{ res.code }}</dd>
+        <dt>For</dt><dd>{{ res.court.name }}, {{ res.date|date:"M j" }}</dd>
+      </dl>
+      <div class="total-row">
+        <span style="font-weight: 700">Amount</span>
+        <span class="amt">{{ res.balance_due|peso }}</span>
+      </div>
+      <form method="post" class="stack-sm">
+        {% csrf_token %}
+        <input type="hidden" name="method" value="{{ method }}">
+        <button class="btn btn-lime btn-lg btn-block" type="submit" name="action" value="pay">Pay {{ res.balance_due|peso }}</button>
+        <button class="btn btn-block" type="submit" name="action" value="fail">Simulate a failed payment</button>
+        {% if desk_allowed %}
+        <button class="btn-link" type="submit" name="action" value="switch_desk" style="align-self: center">Pay at the front desk instead</button>
+        {% endif %}
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock %}

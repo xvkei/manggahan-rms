@@ -1,0 +1,100 @@
+{% extends "staff/base.html" %}
+{% load rms %}
+{% block title %}Reservations and refunds · Manggahan admin{% endblock %}
+
+{% block content %}
+<div class="shead">
+  <div>
+    <div class="k">{% now "l, F j, Y" %}</div>
+    <h1>Reservations &amp; refunds</h1>
+  </div>
+  <form method="get" role="search" class="row">
+    <input type="hidden" name="status" value="{{ status }}">
+    <label class="sr-only" for="rq">Search</label>
+    <input id="rq" type="search" name="q" value="{{ q }}" placeholder="Name, mobile, reservation no., or payment ref" style="width: 320px; border-radius: 999px">
+    <button class="btn" type="submit">Search</button>
+  </form>
+</div>
+
+<div class="row" aria-label="Filter by status">
+  {% for key, label, statuses in filters %}
+    <a class="chip {% if status == key %}is-on{% elif key == 'pending' %}chip-warn{% elif key == 'cancel_requested' %}chip-bad{% endif %}" href="?status={{ key }}{% if q %}&q={{ q|urlencode }}{% endif %}">{{ label }}{% if key == "pending" %} · {{ counts.pending }}{% elif key == "cancel_requested" %} · {{ counts.cancel_requested }}{% endif %}</a>
+  {% endfor %}
+</div>
+
+<div class="split">
+  <section class="grow card card-flush">
+    <div class="scroll-x">
+      <table class="tbl" style="min-width: 760px">
+        <thead><tr><th>Reservation</th><th>Player</th><th>Court and schedule</th><th class="right">Amount</th><th>Status</th><th><span class="sr-only">Action</span></th></tr></thead>
+        <tbody>
+          {% for r in page %}
+          <tr class="{% if r.status == 'cancel_requested' %}hl{% endif %}">
+            <td><b>{{ r.code }}</b><div class="sub">{{ r.get_source_display }}{% if r.league %} · {{ r.league.name }}{% endif %}</div></td>
+            <td>{{ r.player.name }}<div class="sub">{{ r.get_player_type_display }}</div></td>
+            <td>{{ r.court.name }}<div class="sub">{{ r.date|date:"M j" }} · {% hour_range r.start_hour r.end_hour %}</div></td>
+            <td class="right">{{ r.total|peso:0 }}{% if r.balance_due and r.status != "cancelled" and r.status != "released" %}<div class="sub" style="color: var(--warn-fg)">{{ r.balance_due|peso:0 }} due</div>{% endif %}</td>
+            <td><span class="badge {{ r.status|status_class }}">{{ r.get_status_display }}</span></td>
+            <td><a class="btn btn-sm{% if r.status == 'pending' %} btn-lime{% endif %}" href="{% url 'staff_schedule' %}?date={{ r.date|date:'Y-m-d' }}&sel={{ r.code }}">{% if r.status == "pending" %}Collect{% else %}Open{% endif %}</a></td>
+          </tr>
+          {% empty %}
+          <tr><td colspan="6" class="muted" style="padding: 24px 16px">No reservations match. Try another filter or search.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    <div class="pager">
+      <span>Showing {{ page.start_index }} to {{ page.end_index }} of {{ page.paginator.count }}</span>
+      <span class="row" style="gap: 6px">
+        {% if page.has_previous %}<a class="round-btn" style="width: 40px; height: 40px" href="?status={{ status }}&q={{ q|urlencode }}&page={{ page.previous_page_number }}" aria-label="Previous page">‹</a>{% endif %}
+        {% if page.has_next %}<a class="round-btn" style="width: 40px; height: 40px" href="?status={{ status }}&q={{ q|urlencode }}&page={{ page.next_page_number }}" aria-label="Next page">›</a>{% endif %}
+      </span>
+    </div>
+  </section>
+
+  <aside class="aside">
+    <h2 class="display" style="font-size: 22px">Cancellation requests</h2>
+    {% for f in refunds %}
+    <article class="card card-tight stack-sm">
+      <div>
+        <b style="font-size: 16px">{{ f.reservation.player.name }}</b> <span class="small muted">· {{ f.reservation.get_player_type_display }}</span>
+        <div class="small muted">{{ f.reservation.court.name }} · {{ f.reservation.date|date:"D, M j" }} · {% hour_range f.reservation.start_hour f.reservation.end_hour %}</div>
+      </div>
+      <div class="tier {% if f.percent == 100 %}tier-ok{% elif f.percent == 50 %}tier-warn{% else %}tier-bad{% endif %}" style="font-size: 14px">
+        {% if f.tier == "difference" %}Rescheduled to a cheaper time{% else %}Requested {{ f.hours_before }} hrs before start{% endif %}<br><b style="font-size: 14px; display: inline">{{ f.get_tier_display }}</b>
+      </div>
+      <div class="row-between"><span class="small muted">Refund to {{ f.destination }}</span><b class="display" style="font-size: 24px">{{ f.amount|peso }}</b></div>
+      {% if is_manager %}
+      <form method="post" action="{% url 'staff_refund_decide' f.pk %}" class="stack-sm">
+        {% csrf_token %}
+        <input type="hidden" name="next" value="{{ request.get_full_path }}">
+        <div class="row">
+          <button class="btn btn-green" style="flex: 2 1 0" type="submit" name="decision" value="approve">Approve refund</button>
+          <button class="btn" style="flex: 1 1 0" type="submit" name="decision" value="decline">Decline</button>
+        </div>
+        <input type="text" name="reason" placeholder="Reason (needed to decline)">
+      </form>
+      {% else %}
+      <p class="small muted" style="margin: 0">A manager approves refunds.</p>
+      {% endif %}
+    </article>
+    {% empty %}
+    <div class="card card-tight"><b>No requests waiting</b><p class="small muted" style="margin: 4px 0 0">When a player cancels, the refund is computed from the policy and shows up here.</p></div>
+    {% endfor %}
+
+    {% if recent_complex %}
+    <div class="alert alert-info"><b>Complex cancellation handled.</b> {{ recent_complex.reservation.player.name }} got a full {{ recent_complex.amount|peso }} refund automatically ({{ recent_complex.reason }}).</div>
+    {% endif %}
+
+    <div class="card card-tight small">
+      <b style="display: block; font-size: 14px; margin-bottom: 10px">Refund policy (applied automatically)</b>
+      <div class="stack-sm">
+        <div class="row" style="gap: 8px"><i class="sw" style="background: #3E8E55"></i>24 hrs or more before: full refund</div>
+        <div class="row" style="gap: 8px"><i class="sw" style="background: #E2A92A"></i>Less than 24 hrs: 50% refund</div>
+        <div class="row" style="gap: 8px"><i class="sw" style="background: #B5402F"></i>No-show: no refund</div>
+        <div class="row" style="gap: 8px"><i class="sw" style="background: #1E4A8A"></i>Cancelled by the complex: full refund</div>
+      </div>
+    </div>
+  </aside>
+</div>
+{% endblock %}

@@ -1,0 +1,35 @@
+{% extends "staff/base.html" %}
+{% load rms %}
+{% block title %}Receipt {{ sale.code }} · Manggahan admin{% endblock %}
+{% block content %}
+<div class="row no-print">
+  <a class="btn" href="{% url 'staff_walkin' %}">New sale</a>
+  <button class="btn btn-lime" type="button" onclick="window.print()">Print receipt</button>
+  {% if sale.reservation %}<a class="btn" href="{% url 'staff_schedule' %}?date={{ sale.reservation.date|date:'Y-m-d' }}&sel={{ sale.reservation.code }}">Open booking</a>{% endif %}
+</div>
+<div class="receipt">
+  <div style="text-align: center">
+    <b class="display" style="font-size: 20px">{{ COMPLEX_NAME }}</b>
+    <div class="small muted">{{ COMPLEX_LOCATION }}</div>
+    <div class="small muted">Receipt {{ sale.code }} · {{ sale.created_at|date:"M j, Y g:i A" }}</div>
+  </div>
+  <div class="rule"></div>
+  <div class="small">Customer: <b>{{ sale.customer_name|default:"Walk-in" }}</b>{% if sale.player.mobile %} · {{ sale.player.mobile }}{% endif %}</div>
+  {% if sale.reservation %}<div class="small">Booking: <b>{{ sale.reservation.code }}</b></div>{% endif %}
+  <div class="rule"></div>
+  <div class="stack-sm">
+    {% for l in lines %}
+    <div class="cart-line"><span>{{ l.description }}{% if l.quantity > 1 %} × {{ l.quantity }}{% endif %}</span><b>{{ l.line_total|peso }}</b></div>
+    {% endfor %}
+  </div>
+  <div class="rule"></div>
+  <div class="cart-line" style="font-size: 18px"><b>Total</b><b>{{ sale.total|peso }}</b></div>
+  <div class="cart-line"><span>Paid by</span><span>{{ sale.get_method_display }}</span></div>
+  {% if sale.cash_received is not None %}
+  <div class="cart-line"><span>Cash received</span><span>{{ sale.cash_received|peso }}</span></div>
+  <div class="cart-line"><span>Change</span><span>{{ sale.change|peso }}</span></div>
+  {% endif %}
+  <div class="rule"></div>
+  <div class="small muted" style="text-align: center">Served by {{ sale.created_by.get_full_name|default:sale.created_by.username }}. Thank you for playing!</div>
+</div>
+{% endblock %}

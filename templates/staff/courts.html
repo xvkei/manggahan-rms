@@ -1,0 +1,203 @@
+{% extends "staff/base.html" %}
+{% load rms %}
+{% block title %}Courts, rates and promos · Manggahan admin{% endblock %}
+{% block content %}
+<div class="shead">
+  <div>
+    <div class="k">Manager view · changes apply to new bookings</div>
+    <h1>Courts, rates &amp; promos</h1>
+  </div>
+</div>
+
+<div class="split">
+  <div class="grow">
+    <form method="post" class="card card-flush">
+      {% csrf_token %}
+      <input type="hidden" name="action" value="save_rates">
+      <div class="row-between" style="padding: 16px 18px; border-bottom: 1px solid var(--line)">
+        <h2 style="font-family: var(--body); font-size: 17px; font-weight: 700">Courts and hourly rates</h2>
+        <span class="small muted">Open daily {{ cfg.open_hour|hour12 }} to {{ cfg.close_hour|hour12 }}</span>
+      </div>
+      <div class="scroll-x">
+        <table class="tbl" style="min-width: 620px">
+          <thead><tr><th>Court</th><th>{{ cfg.open_hour|hour_short }} to {{ cfg.evening_start_hour|hour_short }}</th><th>{{ cfg.evening_start_hour|hour_short }} to {{ cfg.close_hour|hour_short }}</th><th>Open for booking</th></tr></thead>
+          <tbody>
+            {% for c in courts %}
+            <tr>
+              <td><b>{{ c.name }}</b><div class="sub">{{ c.get_sport_display }}{% if c.unit_note %} · {{ c.unit_note }}{% endif %}</div></td>
+              <td><span class="money-input">₱<input type="text" inputmode="decimal" name="day_{{ c.pk }}" value="{{ c.day_rate|floatformat:0 }}" aria-label="{{ c.name }} daytime rate"></span></td>
+              <td><span class="money-input">₱<input type="text" inputmode="decimal" name="eve_{{ c.pk }}" value="{{ c.evening_rate|floatformat:0 }}" aria-label="{{ c.name }} evening rate"></span></td>
+              <td><input type="checkbox" name="active_{{ c.pk }}" {% if c.is_active %}checked{% endif %} aria-label="{{ c.name }} open for booking"></td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      <div class="row" style="padding: 14px 18px; border-top: 1px solid #EEF0EA"><button class="btn btn-lime" type="submit">Save rates</button></div>
+    </form>
+
+    <details class="card card-tight">
+      <summary style="cursor: pointer; font-weight: 700">Add a court</summary>
+      <form method="post" class="grid-fields mt-2" style="align-items: end">
+        {% csrf_token %}<input type="hidden" name="action" value="add_court">
+        <label class="field">Name<input type="text" name="name" required></label>
+        <label class="field">Sport<select name="sport">{% for code, label in sports %}<option value="{{ code }}">{{ label }}</option>{% endfor %}</select></label>
+        <label class="field">Daytime rate<input type="text" name="day_rate" inputmode="decimal" required></label>
+        <label class="field">Evening rate<input type="text" name="evening_rate" inputmode="decimal" required></label>
+        <button class="btn btn-green" type="submit">Add court</button>
+      </form>
+    </details>
+
+    <section class="card card-tight">
+      <h2 style="font-family: var(--body); font-size: 17px; font-weight: 700">Block a court for maintenance</h2>
+      <p class="small muted" style="margin: 4px 0 14px">Affected players are cancelled with a full refund and notified by SMS automatically.</p>
+      <form method="post" class="stack-sm">
+        {% csrf_token %}
+        <div class="grid-fields" style="grid-template-columns: repeat(auto-fit, minmax(140px, 1fr))">
+          <label class="field">Court<select name="court" required><option value="">Choose</option>{% for c in courts %}<option value="{{ c.pk }}" {% if block_form.court == c.pk|stringformat:"s" %}selected{% endif %}>{{ c.name }}</option>{% endfor %}</select></label>
+          <label class="field">Date<input type="date" name="date" value="{{ block_form.date }}" required></label>
+          <label class="field">From<select name="start">{% for h in hours %}<option value="{{ h }}" {% if block_form.start == h|stringformat:"s" %}selected{% endif %}>{{ h|hour12 }}</option>{% endfor %}</select></label>
+          <label class="field">To<select name="end">{% for h in end_hours %}<option value="{{ h }}" {% if block_form.end == h|stringformat:"s" %}selected{% elif not block_form.end and forloop.last %}selected{% endif %}>{{ h|hour12 }}</option>{% endfor %}</select></label>
+          <label class="field">Reason<input type="text" name="reason" value="{{ block_form.reason }}" placeholder="Floor refinishing" required></label>
+        </div>
+        {% if block_preview %}
+        <div class="alert alert-info">
+          <b>{{ block_preview.court.name }}, {{ block_preview.date|date:"D, M j" }}, {{ block_preview.time }}:</b>
+          {{ block_preview.affected|length }} booking{{ block_preview.affected|length|pluralize }} affected, {{ block_preview.total|peso }} to refund in full.
+          {% for r in block_preview.affected %}<div class="small">{{ r.code }} · {{ r.player.name }} · {% hour_range r.start_hour r.end_hour %} · {{ r.amount_paid|peso }} paid</div>{% endfor %}
+        </div>
+        <div class="row">
+          <button class="btn btn-green" type="submit" name="action" value="block_confirm">Block and refund</button>
+          <a class="btn" href="{% url 'staff_courts' %}">Cancel</a>
+        </div>
+        {% else %}
+        <div class="row"><button class="btn" type="submit" name="action" value="block_preview">Check affected bookings</button></div>
+        {% endif %}
+      </form>
+      {% if upcoming_blocks %}
+      <div class="mt-2">
+        <div class="small" style="font-weight: 700; margin-bottom: 6px">Upcoming blocks</div>
+        {% for b in upcoming_blocks %}<div class="small muted">{{ b.date|date:"M j" }} · {{ b.court.name }} · {% hour_range b.start_hour b.end_hour %} · {{ b.reason }}</div>{% endfor %}
+      </div>
+      {% endif %}
+    </section>
+
+    <form method="post" class="card card-flush">
+      {% csrf_token %}<input type="hidden" name="action" value="save_items">
+      <div class="row-between" style="padding: 16px 18px; border-bottom: 1px solid var(--line)">
+        <h2 style="font-family: var(--body); font-size: 17px; font-weight: 700">Items for rent and sale</h2>
+        <span class="small muted">Used in Walk-in &amp; sales and online add-ons</span>
+      </div>
+      <div class="scroll-x">
+        <table class="tbl" style="min-width: 520px">
+          <thead><tr><th>Item</th><th>Category</th><th>Price</th><th>Available</th></tr></thead>
+          <tbody>
+            {% for i in items %}
+            <tr>
+              <td><b>{{ i.name }}</b>{% if i.bookable_online %}<div class="sub">Online add-on</div>{% endif %}</td>
+              <td>{{ i.get_category_display }}</td>
+              <td><span class="money-input">₱<input type="text" inputmode="decimal" name="price_{{ i.pk }}" value="{{ i.price|floatformat:0 }}" aria-label="{{ i.name }} price"></span></td>
+              <td><input type="checkbox" name="item_active_{{ i.pk }}" {% if i.is_active %}checked{% endif %} aria-label="{{ i.name }} available"></td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      <div class="row" style="padding: 14px 18px; border-top: 1px solid #EEF0EA"><button class="btn btn-lime" type="submit">Save item prices</button></div>
+    </form>
+    <details class="card card-tight">
+      <summary style="cursor: pointer; font-weight: 700">Add an item</summary>
+      <form method="post" class="grid-fields mt-2" style="align-items: end">
+        {% csrf_token %}<input type="hidden" name="action" value="add_item">
+        <label class="field">Name<input type="text" name="name" required></label>
+        <label class="field">Category<select name="category">{% for code, label in item_categories %}<option value="{{ code }}">{{ label }}</option>{% endfor %}</select></label>
+        <label class="field">Price<input type="text" name="price" inputmode="decimal" required></label>
+        <label class="check"><input type="checkbox" name="bookable_online">Offer as online add-on</label>
+        <button class="btn btn-green" type="submit">Add item</button>
+      </form>
+    </details>
+  </div>
+
+  <aside class="aside">
+    <form method="post" class="card card-tight stack-sm">
+      {% csrf_token %}<input type="hidden" name="action" value="save_discounts">
+      <h2 style="font-family: var(--body); font-size: 17px; font-weight: 700">Player discounts</h2>
+      <div class="row-between"><span>Student</span><span class="money-input"><input type="number" name="student_discount" value="{{ cfg.student_discount }}" min="0" max="100" aria-label="Student discount percent">%</span></div>
+      <div class="row-between"><span>Member</span><span class="money-input"><input type="number" name="member_discount" value="{{ cfg.member_discount }}" min="0" max="100" aria-label="Member discount percent">%</span></div>
+      <div class="row-between"><span>Senior citizen / PWD <span class="small muted">(required by law)</span></span><b>{{ cfg.senior_pwd_discount }}%</b></div>
+      <p class="small muted" style="margin: 0">Discounts don't stack. Each hour gets the biggest single discount (player type or promo).</p>
+      <button class="btn btn-lime btn-sm" type="submit">Save discounts</button>
+    </form>
+
+    <section class="card card-tight stack-sm">
+      <h2 style="font-family: var(--body); font-size: 17px; font-weight: 700">Off-peak promos</h2>
+      {% for p in promos %}
+      <div class="toggle-row">
+        <span><b style="display: block; font-size: 14px">{{ p.name }} · {{ p.percent }}% off</b><span class="small muted">{{ p.weekdays_label }}, {{ p.start_hour|hour_short }} to {{ p.end_hour|hour_short }}{% if p.sport %} · {{ p.get_sport_display }}{% else %} · all courts{% endif %}</span></span>
+        <span class="row" style="gap: 6px">
+          <form method="post">{% csrf_token %}<input type="hidden" name="action" value="toggle_promo"><input type="hidden" name="pk" value="{{ p.pk }}"><button class="btn btn-sm {% if p.is_active %}btn-green{% endif %}" type="submit" aria-pressed="{{ p.is_active|yesno:'true,false' }}">{% if p.is_active %}On{% else %}Off{% endif %}</button></form>
+          <form method="post" data-confirm="Delete this promo?">{% csrf_token %}<input type="hidden" name="action" value="delete_promo"><input type="hidden" name="pk" value="{{ p.pk }}"><button class="btn btn-sm" type="submit" aria-label="Delete {{ p.name }}">×</button></form>
+        </span>
+      </div>
+      {% empty %}
+      <p class="small muted" style="margin: 0">No promos yet.</p>
+      {% endfor %}
+      <details>
+        <summary class="small" style="cursor: pointer; font-weight: 700">New promo</summary>
+        <form method="post" class="stack-sm mt-1">
+          {% csrf_token %}<input type="hidden" name="action" value="add_promo">
+          <label class="field">Name<input type="text" name="name" placeholder="Weekday mornings" required></label>
+          <label class="field">Percent off<input type="number" name="percent" min="1" max="100" required></label>
+          <div class="row" style="gap: 6px">{% for i, d in weekday_names %}<label class="chip" style="gap: 6px; min-height: 36px; padding: 0 10px"><input type="checkbox" name="weekdays" value="{{ i }}" {% if i < 5 %}checked{% endif %}>{{ d }}</label>{% endfor %}</div>
+          <div class="grid-fields" style="grid-template-columns: 1fr 1fr">
+            <label class="field">From<select name="start_hour">{% for h in hours %}<option value="{{ h }}">{{ h|hour12 }}</option>{% endfor %}</select></label>
+            <label class="field">To<select name="end_hour">{% for h in end_hours %}<option value="{{ h }}">{{ h|hour12 }}</option>{% endfor %}</select></label>
+          </div>
+          <label class="field">Sport<select name="sport"><option value="">All courts</option>{% for code, label in sports %}<option value="{{ code }}">{{ label }}</option>{% endfor %}</select></label>
+          <button class="btn btn-green btn-sm" type="submit">Add promo</button>
+        </form>
+      </details>
+    </section>
+
+    <section class="card card-tight stack-sm">
+      <div class="row-between"><h2 style="font-family: var(--body); font-size: 17px; font-weight: 700">Memberships and packages</h2><span class="small muted">{{ active_members }} active member{{ active_members|pluralize }}</span></div>
+      {% for p in plans %}
+      <div class="toggle-row" style="{% if not p.is_active %}opacity: 0.6{% endif %}">
+        <span><b style="display: block; font-size: 14px">{{ p.name }} · {{ p.price|peso:0 }}</b><span class="small muted">{{ p.description|default:p.get_kind_display }}{% if p.hours %} · {{ p.hours }} hrs{% endif %} · valid {{ p.valid_days }} days</span></span>
+        <form method="post">{% csrf_token %}<input type="hidden" name="action" value="toggle_plan"><input type="hidden" name="pk" value="{{ p.pk }}"><button class="btn btn-sm" type="submit">{% if p.is_active %}Hide{% else %}Show{% endif %}</button></form>
+      </div>
+      {% endfor %}
+      <details>
+        <summary class="small" style="cursor: pointer; font-weight: 700">New plan</summary>
+        <form method="post" class="stack-sm mt-1">
+          {% csrf_token %}<input type="hidden" name="action" value="add_plan">
+          <label class="field">Name<input type="text" name="name" required></label>
+          <label class="field">Type<select name="kind">{% for code, label in plan_kinds %}<option value="{{ code }}">{{ label }}</option>{% endfor %}</select></label>
+          <div class="grid-fields" style="grid-template-columns: 1fr 1fr">
+            <label class="field">Price<input type="text" name="price" inputmode="decimal" required></label>
+            <label class="field">Hours (packages)<input type="number" name="hours" min="0" value="0"></label>
+          </div>
+          <div class="grid-fields" style="grid-template-columns: 1fr 1fr">
+            <label class="field">Sport<select name="sport"><option value="">Any</option>{% for code, label in sports %}<option value="{{ code }}">{{ label }}</option>{% endfor %}</select></label>
+            <label class="field">Valid for (days)<input type="number" name="valid_days" min="1" value="30"></label>
+          </div>
+          <label class="field">Description<input type="text" name="description" placeholder="10% off bookings, priority booking"></label>
+          <button class="btn btn-green btn-sm" type="submit">Add plan</button>
+        </form>
+      </details>
+    </section>
+
+    <form method="post" class="card card-tight stack-sm">
+      {% csrf_token %}<input type="hidden" name="action" value="save_rules">
+      <h2 style="font-family: var(--body); font-size: 17px; font-weight: 700">Booking and loyalty rules</h2>
+      <div class="row-between small"><span>Evening rate starts at</span><select name="evening_start_hour" style="width: 120px; min-height: 40px">{% for h in hours %}<option value="{{ h }}" {% if h == cfg.evening_start_hour %}selected{% endif %}>{{ h|hour12 }}</option>{% endfor %}</select></div>
+      <div class="row-between small"><span>No-show grace period (minutes)</span><span class="money-input"><input type="number" name="grace_minutes" value="{{ cfg.grace_minutes }}" min="0"></span></div>
+      <div class="row-between small"><span>Pay-at-desk deadline (hours after booking)</span><span class="money-input"><input type="number" name="pay_deadline_hours" value="{{ cfg.pay_deadline_hours }}" min="1"></span></div>
+      <div class="row-between small"><span>Latest payment (hours before game)</span><span class="money-input"><input type="number" name="pay_cutoff_hours_before" value="{{ cfg.pay_cutoff_hours_before }}" min="0"></span></div>
+      <div class="row-between small"><span>Pesos per loyalty point</span><span class="money-input"><input type="number" name="peso_per_point" value="{{ cfg.peso_per_point }}" min="1"></span></div>
+      <div class="row-between small"><span>Points for 1 free hour</span><span class="money-input"><input type="number" name="points_per_free_hour" value="{{ cfg.points_per_free_hour }}" min="1"></span></div>
+      <button class="btn btn-lime btn-sm" type="submit">Save rules</button>
+    </form>
+  </aside>
+</div>
+{% endblock %}

@@ -1,0 +1,20 @@
+{% extends "player/base.html" %}
+{% block title %}Sign in · {{ COMPLEX_NAME }}{% endblock %}
+{% block content %}
+<div class="page-narrow">
+  {% include "partials/messages.html" %}
+  <section class="card stack" style="max-width: 460px; margin: 24px auto">
+    <h1 class="display" style="font-size: 28px">Sign in</h1>
+    <p class="muted" style="margin: 0">For regulars who made an account. You can always book as a guest with just your mobile number.</p>
+    {% if error %}<div class="alert alert-error" role="alert">{{ error }}</div>{% endif %}
+    <form method="post" class="stack">
+      {% csrf_token %}
+      <input type="hidden" name="next" value="{{ next }}">
+      <label class="field">Mobile number<input type="tel" name="mobile" value="{{ mobile }}" placeholder="0917 123 4567" autocomplete="username" required></label>
+      <label class="field">Password<input type="password" name="password" autocomplete="current-password" required></label>
+      <button class="btn btn-lime btn-lg" type="submit">Sign in</button>
+    </form>
+    <p class="small muted" style="margin: 0">No account yet? <a href="{% url 'player_signup' %}">Create one</a> with your mobile number.</p>
+  </section>
+</div>
+{% endblock %}

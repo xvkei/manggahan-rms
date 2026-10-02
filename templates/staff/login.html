@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+{% block title %}Staff sign in · {{ COMPLEX_NAME }}{% endblock %}
+{% block body %}
+<div class="login-wrap">
+  <div class="login-card">
+    <div class="row" style="gap: 10px">
+      <span style="background: var(--green); border-radius: 10px; padding: 6px; display: inline-flex">{% include "partials/logo.html" %}</span>
+      <div><b class="display" style="font-size: 20px">Manggahan</b><div class="small muted">Front desk and manager sign in</div></div>
+    </div>
+    {% include "partials/messages.html" %}
+    {% if error %}<div class="alert alert-error" role="alert">{{ error }}</div>{% endif %}
+    <form method="post" class="stack">
+      {% csrf_token %}
+      <label class="field">Username<input type="text" name="username" autocomplete="username" required autofocus></label>
+      <label class="field">Password<input type="password" name="password" autocomplete="current-password" required></label>
+      <button class="btn btn-lime btn-lg" type="submit">Sign in</button>
+    </form>
+    {% if DEMO_MODE %}
+    <div class="demo-note">Demo accounts: <b>manager</b> / manager123 (full access) or <b>frontdesk</b> / frontdesk123.</div>
+    {% endif %}
+    <a class="small" href="{% url 'home' %}">Go to the player booking site</a>
+  </div>
+</div>
+{% endblock %}

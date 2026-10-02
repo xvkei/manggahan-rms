@@ -1,0 +1,20 @@
+{% extends "player/base.html" %}
+{% block title %}Create account · {{ COMPLEX_NAME }}{% endblock %}
+{% block content %}
+<div class="page-narrow">
+  {% include "partials/messages.html" %}
+  <section class="card stack" style="max-width: 460px; margin: 24px auto">
+    <h1 class="display" style="font-size: 28px">Create an account</h1>
+    <p class="muted" style="margin: 0">See all your bookings in one place, check out faster, and earn loyalty points.</p>
+    <div class="badge st-confirmed" style="align-self: flex-start; font-size: 13px; padding: 6px 12px">{{ mobile }} verified</div>
+    {% if error %}<div class="alert alert-error" role="alert">{{ error }}</div>{% endif %}
+    <form method="post" class="stack">
+      {% csrf_token %}
+      <label class="field">Full name<input type="text" name="name" value="{{ name }}" autocomplete="name" required></label>
+      <label class="field">Password <span class="hint">At least 6 characters</span><input type="password" name="password" autocomplete="new-password" required></label>
+      <label class="field">Type it again<input type="password" name="password2" autocomplete="new-password" required></label>
+      <button class="btn btn-lime btn-lg" type="submit">Create account</button>
+    </form>
+  </section>
+</div>
+{% endblock %}

@@ -1,0 +1,66 @@
+{% extends "staff/base.html" %}
+{% load rms %}
+{% block title %}Leagues and tournaments · Manggahan admin{% endblock %}
+{% block content %}
+<div class="shead">
+  <div>
+    <div class="k">Block-book a court for a whole season or event, with one invoice</div>
+    <h1>Leagues &amp; tournaments</h1>
+  </div>
+</div>
+{% if errors %}<div class="alert alert-error" role="alert"><ul>{% for e in errors %}<li>{{ e }}</li>{% endfor %}</ul></div>{% endif %}
+
+<form method="post" class="split">
+  {% csrf_token %}
+  <div class="grow">
+    <section class="card stack">
+      <h2 style="font-size: 22px">Details</h2>
+      <div class="grid-fields">
+        <label class="field">League or tournament name<input type="text" name="name" value="{{ form.name }}" placeholder="Office League" required></label>
+        <label class="field">Team captain<input type="text" name="captain" value="{{ form.captain }}" required></label>
+        <label class="field">Captain's mobile<input type="tel" name="mobile" value="{{ form.mobile }}" placeholder="09XX XXX XXXX" required></label>
+      </div>
+      <div class="grid-fields">
+        <label class="field">Court
+          <select name="court" required>
+            <option value="">Choose a court</option>
+            {% for c in courts %}<option value="{{ c.pk }}" {% if form.court == c.pk|stringformat:"s" %}selected{% endif %}>{{ c.name }}</option>{% endfor %}
+          </select>
+        </label>
+        <label class="field">First date<input type="date" name="first_date" value="{{ form.first_date }}" min="{{ today|date:'Y-m-d' }}" required></label>
+        <label class="field">Repeat weekly for<select name="weeks">{% for n in "12345678901234567890" %}<option value="{{ forloop.counter }}" {% if form.weeks == forloop.counter|stringformat:"s" %}selected{% endif %}>{{ forloop.counter }} week{{ forloop.counter|pluralize }}</option>{% endfor %}</select></label>
+      </div>
+      <div class="grid-fields">
+        <label class="field">Start<select name="start">{% for h in hours %}<option value="{{ h }}" {% if form.start == h|stringformat:"s" %}selected{% endif %}>{{ h|hour12 }}</option>{% endfor %}</select></label>
+        <label class="field">End<select name="end">{% for h in end_hours %}<option value="{{ h }}" {% if form.end == h|stringformat:"s" %}selected{% endif %}>{{ h|hour12 }}</option>{% endfor %}</select></label>
+      </div>
+      <p class="small muted" style="margin: 0">For a tournament over several days in a row, book each day separately or set the first date and 1 week.</p>
+      <div class="row"><button class="btn btn-green" type="submit" name="action" value="preview">Check dates</button></div>
+    </section>
+  </div>
+
+  <aside class="aside">
+    <section class="card card-tight stack">
+      <h2 style="font-family: var(--body); font-size: 17px; font-weight: 700">Preview</h2>
+      {% if preview %}
+        <div class="small"><b>{{ form.name }}</b> · {{ preview.court.name }} · {{ preview.time }}</div>
+        <div class="date-pills">
+          {% for r in preview.rows %}
+          <span class="pill {% if r.ok %}pill-ok{% else %}pill-bad{% endif %}" title="{% if r.ok %}{{ r.amount|peso }}{% else %}{{ r.reason }}{% endif %}">{{ r.date|date:"M j" }}{% if not r.ok %} · conflict{% endif %}</span>
+          {% endfor %}
+        </div>
+        <p class="small" style="margin: 0">{{ preview.free_count }} date{{ preview.free_count|pluralize }} free{% if preview.conflicts %}, {{ preview.conflicts }} conflict{{ preview.conflicts|pluralize }} (skipped){% endif %}. Team rate, one invoice: <b>{{ preview.total|peso }}</b></p>
+        {% for r in preview.rows %}{% if not r.ok %}<div class="small" style="color: var(--bad-fg)">{{ r.date|date:"M j" }}: {{ r.reason }}</div>{% endif %}{% endfor %}
+        <label class="check"><input type="checkbox" name="pay_now" {% if form.pay_now %}checked{% endif %}>Paid now</label>
+        <div class="row" style="gap: 6px">
+          {% for value, label in desk_methods %}<label class="chip" style="gap: 6px"><input type="radio" name="method" value="{{ value }}" {% if form.method == value %}checked{% endif %}>{{ label }}</label>{% endfor %}
+        </div>
+        <p class="small muted" style="margin: 0">If not paid now, all dates stay Pending and must be paid by the deadline.</p>
+        <button class="btn btn-lime btn-lg" type="submit" name="action" value="create" {% if not preview.free_count %}disabled{% endif %}>Book {{ preview.free_count }} date{{ preview.free_count|pluralize }}</button>
+      {% else %}
+        <p class="small muted" style="margin: 0">Fill in the details and press Check dates. Conflicts with existing bookings or maintenance are flagged before anything is booked.</p>
+      {% endif %}
+    </section>
+  </aside>
+</form>
+{% endblock %}
